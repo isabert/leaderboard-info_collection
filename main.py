@@ -16,9 +16,9 @@ incomplete_data = {}
 image_types = ["png", "jpeg", "jpg"]
 image_name = {}
 tournament = {
-  1:"Doodle 2018 pvp single round",
-  2:"Sketchful.io pair game",
-  3:"2048 single round"
+  1:"2048 single round",
+  2:"Doodle 2018 4v4 single round",
+  3:"Sketchful.io pair game"
 }
 
 @client.event
@@ -97,11 +97,12 @@ async def on_message(message):
         await message.channel.send("Processing... ")
         entries = db['entries']
         i = len(entries)
-        #entries: user_name, game_id, score
+        #entries: user_name, game_id, score,id
         entries.append([])
         entries[i].append(user_name)
         entries[i].append(incomplete_data[user_name]["game_id"])
         entries[i].append(incomplete_data[user_name]["score"])
+        entries[i].append(i)
         db["entries"]=entries
         strt = "ENTRY {} with user {}".format(i,user_name)
         s_game_id = "game_id: {}".format(entries[i][1])
@@ -165,13 +166,15 @@ async def on_message(message):
             os.remove("leaderboard.json")
           await attachment.save(attachment.filename)
           await message.channel.send("The new leaderboard is added successfully")
-          
 
     elif cmd.startswith("$get_leaderboard"):
       if(os.path.exists("leaderboard.json")==False):
         await message.channel.send("Leaderboard is not updated yet...")
       else:
         await message.channel.send(file = discord.File('leaderboard.json'))
+
+    elif cmd.startswith("$tournament"):
+      await message.channel.send(tournament)
       
     
 
@@ -224,7 +227,7 @@ def init_cur_game(user_name):
   incomplete_data[user_name]["score"] = 0
 
 keep_alive()
-db.clear()
+# db.clear()
 clear_pics()
 init_db()
 client.run(os.environ['TOKEN'])
