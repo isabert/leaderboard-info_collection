@@ -17,7 +17,7 @@ image_types = ["png", "jpeg", "jpg"]
 image_name = {}
 tournament = {
   1:"Doodle 2018 pvp single round",
-  2:"Scribble game Triad 12 rounds",
+  2:"Sketchful.io pair game",
   3:"2048 single round"
 }
 
@@ -122,7 +122,7 @@ async def on_message(message):
       entries = db['entries']
       if(os.path.exists("entries.json")):
         os.remove("entries.json")
-      for i in len(entries):
+      for i in range(len(entries)):
         entry = entries[i]
         with open('entries.json', 'a') as file:
           if(i==0):
@@ -132,13 +132,16 @@ async def on_message(message):
             file.write(",\n")
           else:
             file.write("]")
-      
-      await message.author.send(file = discord.File("entries.json"))
+      if(os.path.exists("entries.json")):
+        await message.author.send(file = discord.File("entries.json"))
+      else:
+        await message.author.send("no submitted entries yet")
 
     elif cmd.startswith('$message_admin'):
       adm = await client.fetch_user(int(os.environ['CUR_ADMIN']))
       msg = cmd.split("$message_admin ",1)[1]
       await adm.send('{}: {}'.format(user_name,msg))
+      await message.channel.send("{}, your message is received".format(user_name))
 
     elif cmd.startswith('$lucky'):
       if(message.author.id!=int(os.environ['CUR_ADMIN'])):
