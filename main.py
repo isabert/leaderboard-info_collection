@@ -20,7 +20,6 @@ tournament = {
   2:"Scribble game Triad 12 rounds",
   3:"2048 single round"
 }
-cur_leaderboard = {}
 
 @client.event
 async def on_ready():
@@ -32,9 +31,7 @@ async def on_message(message):
         return
 
     cmd = message.content
-    user = message.author
     user_name = message.author.name
-    user_id = user.id
 
     if cmd.startswith('$set_game_id'):
       game_id_string = cmd.split("$set_game_id ",1)[1]
@@ -125,10 +122,16 @@ async def on_message(message):
       entries = db['entries']
       if(os.path.exists("entries.json")):
         os.remove("entries.json")
-      for entry in entries:
+      for i in len(entries):
+        entry = entries[i]
         with open('entries.json', 'a') as file:
+          if(i==0):
+            file.write('[')
           file.write(json.dumps(list(entry)))
-          file.write("\n")
+          if(i!=len(entries)-1):
+            file.write(",\n")
+          else:
+            file.write("]")
       
       await message.author.send(file = discord.File("entries.json"))
 
