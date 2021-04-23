@@ -1,5 +1,6 @@
 import discord
 import os
+import json
 from replit import db
 from keep_alive import keep_alive
 
@@ -19,6 +20,7 @@ tournament = {
   2:"Scribble game Triad 12 rounds",
   3:"2048 single round"
 }
+cur_leaderboard = {}
 
 @client.event
 async def on_ready():
@@ -29,35 +31,17 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # if message.content.startswith('$hello'):
-        # await message.channel.send('Hello!')
-        # depo_channel =  client.get_channel(int(os.environ['DEPOSITE_CHANNEL']))
-        # await depo_channel.send("HI")
-        # await message.author.send("HI")
-        # the reason we don't use get_user is because it relies on cache, and therefore will return a NONE
-        # adm = await client.fetch_user(int(os.environ['CUR_ADMIN']))
-        # await adm.send("HELLO")
-
     cmd = message.content
     user = message.author
     user_name = message.author.name
     user_id = user.id
-    if cmd.startswith('$set_handle'):
-      handle = cmd.split("$set_handle ",1)[1]
-      await message.channel.send(set_handle(handle,user_name))
 
-    elif cmd.startswith('$get_handle'):
-      await message.channel.send(get_handle(user_name))
-
-    elif cmd.startswith('$list_handles'):
-      await message.channel.send(list(db['existing_handles']))
-      await message.channel.send(dict(db['handles']))
-
-    elif cmd.startswith('$set_game_id'):
-      if(db["handles"].get(user_name) is None):
-        await message.channel.send("{}, please use $set_handle to selete a handle".format(user_name))
+    if cmd.startswith('$set_game_id'):
+      game_id_string = cmd.split("$set_game_id ",1)[1]
+      if game_id_string.isdecimal()==False:
+        await message.channel.send("{}, please enter a positive integer as game_id".format(user_name))
         return
-      game_id = int(cmd.split("$set_game_id ",1)[1])
+      game_id = int(game_id_string)
       if(game_id<=0):
         await message.channel.send("{}, the game_id is smaller than 0!".format(user_name))
       if(game_id>len(tournament)):
@@ -66,10 +50,11 @@ async def on_message(message):
       await message.channel.send("{}, the game_id updated is successfully. Your current game_id is {}.".format(user_name, game_id))
 
     elif cmd.startswith('$set_score'):
-      if(db["handles"].get(user_name) is None):
-        await message.channel.send("{}, please use $set_handle to selete a handle".format(user_name))
+      score_string = cmd.split("$set_score ",1)[1]
+      if(score_string.isdecimal()==False):
+        await message.channel.send("{}, please enter a positive integer as score".format(user_name))
         return
-      score = int(cmd.split("$set_score ",1)[1])
+      score = int(score_string)
       if(score>0):
         await message.channel.send(set_score(user_name,score))
         await message.channel.send("{}, the score of {} is updated successfully.".format(user_name, score))
@@ -78,7 +63,7 @@ async def on_message(message):
 
     elif cmd.startswith('$get_entry'):
       if (incomplete_data.get(user_name)==None
-      and (image_name.get(user_name)==None or image_name.get(user_name)!="")):
+      and (image_name.get(user_name)==None or image_name.get(user_name)=="")):
         await message.channel.send("{}, there is no data yet".format(user_name))
         return 
       if incomplete_data.get(user_name)!=None:
@@ -100,9 +85,8 @@ async def on_message(message):
             pic = "{}.{}".format(user_name,image_type)
             await attachment.save(pic)
             image_name[user_name] = pic
-            await message.channel.send("The image is added successfully")
-            
-            
+            await message.channel.send("The new image is added successfully")
+               
     elif cmd.startswith('$submit'):
       if(incomplete_data.get(user_name)==None
       or incomplete_data[user_name].get("game_id")==None 
@@ -122,7 +106,7 @@ async def on_message(message):
         entries[i].append(incomplete_data[user_name]["game_id"])
         entries[i].append(incomplete_data[user_name]["score"])
         db["entries"]=entries
-        strt = "ENTRY {} with {}'s handle {}".format(i,user_name,db['handles'][user_name])
+        strt = "ENTRY {} with user {}".format(i,user_name)
         s_game_id = "game_id: {}".format(entries[i][1])
         s_score = "score: {}".format(entries[i][2])
         output_text = strt + "\n" + s_game_id + "\n" + s_score + "\n" + 'END ENTRY'
@@ -136,12 +120,56 @@ async def on_message(message):
         incomplete_data[user_name]["score"] = 0
         await message.channel.send("{}'s entry is displayed in {}".format(user_name,depo_channel.name))
 
+    elif cmd.startswith("$export"):
+      await message.channel.send("send by DM")
+      entries = db['entries']
+      if(os.path.exists("entries.json")):
+        os.remove("entries.json")
+      for entry in entries:
+        with open('entries.json', 'a') as file:
+          file.write(json.dumps(list(entry)))
+          file.write("\n")
+      
+      await message.author.send(file = discord.File("entries.json"))
+
+    elif cmd.startswith('$message_admin'):
+      adm = await client.fetch_user(int(os.environ['CUR_ADMIN']))
+      msg = cmd.split("$message_admin ",1)[1]
+      await adm.send('{}: {}'.format(user_name,msg))
+
+    elif cmd.startswith('$lucky'):
+      if(message.author.id!=int(os.environ['CUR_ADMIN'])):
+        return
+      print("HI")
+      lucky_id_string = cmd.split("$lucky ",1)[1]
+      if lucky_id_string.isdecimal()==False:
+        await message.channel.send("{}, please enter a positive integer as lucky_id".format(user_name))
+        return
+      lucky_id = int(lucky_id_string)
+      entry = db['entries'][lucky_id]
+      await message.channel.send(list(entry))
+
+    elif cmd.startswith('$set_leaderboard'):
+      if(message.author.id!=int(os.environ['CUR_ADMIN'])):
+        return
+      for attachment in message.attachments:
+        print(attachment.filename)
+        if attachment.filename == "leaderboard.json":
+          if(os.path.exists("leaderboard.json")):
+            os.remove("leaderboard.json")
+          await attachment.save(attachment.filename)
+          await message.channel.send("The new leaderboard is added successfully")
+          
+
+    elif cmd.startswith("$get_leaderboard"):
+      if(os.path.exists("leaderboard.json")==False):
+        await message.channel.send("Leaderboard is not updated yet...")
+      else:
+        await message.channel.send(file = discord.File('leaderboard.json'))
+      
     
-def init_db():
-    if db.get('existing_handles')==None:
-      db['existing_handles'] = []
-    if db.get('handles') ==None:
-      db['handles'] = {}
+
+def init_db(): 
     if db.get('entries') ==None:
       db['entries'] = []
 
@@ -151,46 +179,18 @@ def clear_pics():
       if(f not in ['main.py', 'keep_alive.py', 'pyproject.toml', 'poetry.lock']):
         os.remove(f)
 
-def set_handle(handle,user_name):
-  s = ""
-  existing_handles = db["existing_handles"]
-  if(handle in existing_handles):
-    return "{} is already used by someone else".format(handle)
-  if "handles" in db.keys():
-    handles = db["handles"]
-    if(handles.get(user_name)!=None):
-      old_handle = handles[user_name]
-      existing_handles.remove(old_handle)
-      handles[user_name] = handle
-      s = "{} has changed their handle from {} to {}!".format(user_name, old_handle, handle)
-    else:
-      init_cur_game(user_name)
-      handles[user_name] = handle
-      s = "{} has added their handle name as {}!".format(user_name, handle)
-    db["handles"] = handles
+def copy_entries():
+  cp = []
+  for ety in db['entries']:
+    cp_ety = []
+    for e in ety:
+      cp_ety.append(e)
+    cp.append(cp_ety)
+  return cp
 
-  else:
-    db["handles"] = {user_name:handle}
-    init_cur_game(user_name)
-    s = "{} has added their handle name as {}!".format(user_name, handle)
-
-  existing_handles.append(handle)
-  db["existing_handles"] = existing_handles
-
-  return s
-
-def get_handle(user_name):
-  if "handles" in db.keys():
-    handles = db["handles"]
-    if(handles.get(user_name)!=None):
-      return "{} has the handle of {}!".format(user_name,handles[user_name] )
-    else:
-      return "{} does not have a handle!".format(user_name)
-
-  else:
-    db["handles"] = {}
-    return "{} does not have a handle!".format(user_name)
-
+def get_user_name(submission_id):
+  return db["entries"][submission_id][0]
+    
 def set_game_id(user_name, game_id):
   s = "processing..."
   if(incomplete_data.get(user_name)==None):
